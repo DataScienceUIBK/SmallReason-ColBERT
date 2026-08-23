@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+.vscode/
+weights/
+data_processed/
+bright_scores/
+logs/
+*.egg-info/

@@ -1,0 +1,23 @@
+# Core
+torch>=2.2,<3.0
+numpy>=1.26
+safetensors>=0.4
+
+# ColBERT-style late interaction.
+# The released model was built and evaluated with pylate 1.5.0; the loader and
+# eval paths were verified against that version.
+pylate>=1.5.0
+sentence-transformers>=3.0
+
+# Training
+transformers>=4.41
+accelerate>=0.30
+datasets>=2.19
+huggingface-hub>=0.23
+
+# Eval
+pyarrow>=15.0
+
+# Optional: install separately if your CUDA stack supports it.
+# The warmup and polish stages default to --attn_implementation flash_attention_2.
+# flash-attn>=2.5
