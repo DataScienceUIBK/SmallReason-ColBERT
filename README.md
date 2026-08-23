@@ -1,17 +1,28 @@
-# SmallReason-ColBERT
+<div align="center">
 
-Training and inference code for **SmallReason-ColBERT**, a 32M late-interaction
-retriever for reasoning-intensive retrieval — a reasoning-tuned ColBERT base plus a
-**129-parameter query-side importance head**.
+# 🔍 SmallReason-ColBERT
 
-**21.41 mean nDCG@10 on BRIGHT** — above every ≤33M ColBERT we evaluated, and within
-1.21 of the 4.7× larger 150M Reason-ModernColBERT.
+**A 32M late-interaction retriever for reasoning-intensive retrieval**
 
-> **Model weights:** [`DataScience-UIBK/SmallReason-ColBERT-32M`](https://huggingface.co/DataScience-UIBK/SmallReason-ColBERT-32M)
+*A reasoning-tuned ColBERT base plus a query-side importance head*
+
+[![🤗 Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-SmallReason--ColBERT--32M-FFD21E)](https://huggingface.co/DataScience-UIBK/SmallReason-ColBERT-32M)
+[![Paper](https://img.shields.io/badge/Paper-EMNLP%202026-B31B1B)](https://2026.emnlp.org/)
+[![Code License](https://img.shields.io/badge/Code-Apache%202.0-3DA639)](LICENSE)
+[![Weights License](https://img.shields.io/badge/Weights-CC--BY--NC--4.0-EF9421)](https://creativecommons.org/licenses/by-nc/4.0/)
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.2%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![PyLate](https://img.shields.io/badge/PyLate-1.5.0-4B8BBE)](https://github.com/lightonai/pylate)
+[![Params](https://img.shields.io/badge/Params-32M-6E7681)](#)
+
+[Install](#-install) &nbsp;·&nbsp; [Inference](#-inference) &nbsp;·&nbsp; [How it works](#-how-it-works) &nbsp;·&nbsp; [Reproduce](#-reproducing-the-model) &nbsp;·&nbsp; [Cite](#-citation)
+
+</div>
 
 ---
 
-## Install
+## 📦 Install
 
 ```bash
 pip install -r requirements.txt
@@ -20,7 +31,7 @@ pip install -r requirements.txt
 The released model was built and verified with **pylate 1.5.0**. No patched or
 vendored pylate is needed.
 
-## Inference
+## 🚀 Inference
 
 ```bash
 python examples/inference.py
@@ -45,7 +56,7 @@ for d in d_embs:
     print(float(WeightedColBERT.weighted_maxsim(q_embs[0], q_weights[0], d)))
 ```
 
-### One thing to know about loading
+### ⚠️ One thing to know about loading
 
 The importance head lives in `importance_head/` and is **not** part of the model's
 `modules.json`. Loading the repo with plain PyLate gives you the un-headed base — no
@@ -61,7 +72,7 @@ through this repo. Pass `require_head=False` if you deliberately want the base.
 
 ---
 
-## How it works
+## 🧠 How it works
 
 ```
 mxbai-edge-colbert-v0-32m  (public 32M ColBERT, 64-d projection)
@@ -86,9 +97,9 @@ the head is a no-op against the frozen base at step zero.
 
 ---
 
-## Reproducing the model
+## 🔬 Reproducing the model
 
-### 0. Data
+### 0️⃣ Data
 
 ```bash
 bash data/build_bge_hn_merged.sh          # ReasonIR-HQ + BGE-Reasoner, ~2.7M rows, ~13 GB
@@ -96,7 +107,7 @@ python data/materialize_reasonir.py --config vl \
        --output-dir data_processed/reasonir_vl_processed   # ~245K rows
 ```
 
-### 1–3. Base (8× H100, ~24 h)
+### 1️⃣–3️⃣ Base (8× H100, ~24 h)
 
 ```bash
 python train/widen_projection.py \
@@ -111,7 +122,7 @@ Both stages use PyLate's `CachedContrastive` loss over in-batch negatives. Overr
 `BASE_MODEL`, `DATA_PATH`, `OUTPUT_DIR`, `CONDA_INIT`, `ENV_NAME` by environment
 variable; the sbatch files assume 2 nodes × 4 GPUs.
 
-### 4. Head (1 GPU, ~12 min)
+### 4️⃣ Head (1 GPU, ~12 min)
 
 ```bash
 python train/train_head.py \
@@ -126,7 +137,7 @@ bash train/assemble_release.sh weights/smallreason-base weights/SmallReason-ColB
 `assemble_release.sh` places the base files alongside `importance_head/` so the
 result is a single loadable directory.
 
-### Evaluate
+### 📊 Evaluate
 
 ```bash
 # BRIGHT, with the head (4 GPUs, ~10 min)
@@ -147,7 +158,7 @@ Protocol: brute-force MaxSim, `query_length=256` (Pony: 32), `document_length=20
 
 ---
 
-## Layout
+## 🗂️ Layout
 
 ```
 src/weighted_colbert.py     model + importance head + weighted MaxSim (the loader)
@@ -162,13 +173,13 @@ eval/                       BRIGHT (headed + plain) and NanoBEIR evaluation
 examples/inference.py       minimal scoring demo
 ```
 
-## License
+## 📄 License
 
 Code: **Apache-2.0** (see `LICENSE`).
 Model weights: **CC-BY-NC-4.0**, inherited from the ReasonIR and BGE-Reasoner
 training data. The upstream base model is Apache-2.0.
 
-## Citation
+## 📝 Citation
 
 ```bibtex
 @inproceedings{smallreason-colbert,
@@ -181,7 +192,7 @@ training data. The upstream base model is Apache-2.0.
 }
 ```
 
-## Acknowledgements
+## 🙏 Acknowledgements
 
 Thanks to Antoine Chaffin (LightOn, Reason-ModernColBERT) for flagging the upstream
 `2_Dense/use_residual` config bug in `mxbai-edge-colbert-v0-32m`.

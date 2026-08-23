@@ -38,20 +38,3 @@ python data/materialize_reasonir.py \
 ```
 
 Size: ~245 K rows.
-
-## File reference
-
-| File | Purpose |
-|---|---|
-| `prepare_data.py` | Loaders for ReasonIR-HQ, ReasonIR-VL, and BRIGHT-eval data |
-| `materialize_reasonir.py` | CLI to dump HQ or VL to disk as a flat `{query,positive,negative}` dataset |
-| `materialize_bge_reasoner.py` | CLI to dump BGE-Reasoner data (12 BRIGHT domains, ~720 K triples) |
-| `merge_datasets.py` | CLI to concatenate + shuffle multiple processed datasets |
-| `build_bge_hn_merged.sh` | One-command wrapper that runs the three steps above |
-| `__init__.py` | Re-exports the loaders so `from data import load_reasonir_hq_dataset` works |
-
-## Caching
-
-All HF downloads land in `${HF_HOME:-~/.cache/huggingface}`. If you want to
-share the cache between users on a cluster filesystem, point `HF_HOME` at
-a shared path before running.
