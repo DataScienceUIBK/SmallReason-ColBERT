@@ -162,27 +162,6 @@ eval/                       BRIGHT (headed + plain) and NanoBEIR evaluation
 examples/inference.py       minimal scoring demo
 ```
 
-## Results
-
-| Model | Params | BRIGHT mean nDCG@10 |
-|---|---:|---:|
-| **SmallReason-ColBERT** | **32M** | **21.41** |
-| SmallReason base (no head) | 32M | 19.61 |
-| answerai-colbert-small-v1 | 33M | 18.49 |
-| mxbai-edge-colbert-v0-17m | 17M | 18.60 |
-| GTE-ModernColBERT-v1 | 150M | 21.72 |
-| Reason-ModernColBERT | 150M | 21.97 (our protocol) |
-
-The head's +1.80 is concentrated in long, symbol-dense splits: LeetCode +12.58,
-AoPS +5.40, TheoremQA-questions +3.96.
-
-## Scope of this repository
-
-This repo contains **training and inference for SmallReason-ColBERT only**. It does
-not ship evaluation result files, baseline-model runners, or the ablation and
-score-variant experiments reported in the paper. Per-split numbers are in the paper
-and on the model card.
-
 ## License
 
 Code: **Apache-2.0** (see `LICENSE`).
