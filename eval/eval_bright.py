@@ -94,7 +94,7 @@ def main():
     ap.add_argument("--bright_root", default=None,
                     help="Optional path to a local BRIGHT snapshot "
                          "(HF datasets cache layout). If unset, downloads via load_dataset.")
-    ap.add_argument("--doc_chunk", type=int, default=2000,
+    ap.add_argument("--doc_chunk", type=int, default=4000,
                     help="Docs per scoring chunk; lower if you hit OOM.")
     ap.add_argument("--device", default=None,
                     help="torch device, e.g. cuda:0 or cpu. Default: cuda:0 if available, else cpu.")

@@ -72,7 +72,7 @@ def main():
     ap.add_argument("--document_length", type=int, default=2048)
     ap.add_argument("--bright_root",
                     default=None)
-    ap.add_argument("--doc_chunk", type=int, default=2000)
+    ap.add_argument("--doc_chunk", type=int, default=4000)
     ap.add_argument("--device", default=None,
                     help="torch device, e.g. cuda:0 or cpu. Default: cuda:0 if available, else cpu.")
     args = ap.parse_args()
