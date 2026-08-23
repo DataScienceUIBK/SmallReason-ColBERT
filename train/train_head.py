@@ -64,6 +64,9 @@ def parse_args():
                    help="Random N(0,1) init for the head weight (paper uses zeros).")
     p.add_argument("--loss_csv", type=str, default=None,
                    help="If set, log per-step (step, loss, head_w_mean, head_w_std) to this CSV.")
+    p.add_argument("--device", default=None,
+                   help="torch device, e.g. cuda:0 or cpu. "
+                        "Default: cuda:0 if available, else cpu.")
     p.add_argument("--head_hidden", type=int, default=0,
                    help="If >0, use 2-layer MLP head Linear(D,H)→ReLU→Linear(H,1). "
                         "0 = paper default (1-layer, 129 params).")
@@ -112,8 +115,12 @@ def main():
 
     model = WeightedColBERT.from_base(
         args.base_model, query_length=args.query_length,
-        document_length=args.document_length, device="cuda:0",
+        document_length=args.document_length,
+        device=args.device or ("cuda:0" if torch.cuda.is_available() else "cpu"),
         head_hidden=args.head_hidden,
+        # We are training the head from scratch, so the base is expected NOT to
+        # have one yet. Only inference paths should demand a trained head.
+        require_head=False,
     )
     # Re-init the head per ablation flags (overrides the WeightedColBERT default of W=0, b=5)
     with torch.no_grad():

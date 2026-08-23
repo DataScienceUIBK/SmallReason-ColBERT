@@ -29,12 +29,23 @@ from pylate import models, evaluation
 
 
 def load_arrow(p: Path) -> Dataset:
+    """Read a BRIGHT .arrow shard into a Dataset.
+
+    The stored schema metadata can reference `datasets` feature types that the
+    installed version does not know about (a cache written by a newer release
+    raises "Feature type 'List' not found"). We drop that metadata and let
+    Dataset infer features from the arrow schema itself.
+    """
     with pa.memory_map(str(p), "r") as mm:
         try:
-            return Dataset(ipc.open_file(mm).read_all())
+            table = ipc.open_file(mm).read_all()
         except Exception:
             mm.seek(0)
-            return Dataset(ipc.open_stream(mm).read_all())
+            table = ipc.open_stream(mm).read_all()
+    try:
+        return Dataset(table)
+    except ValueError:
+        return Dataset(table.replace_schema_metadata(None))
 
 
 def load_bright_split(bright_root: Path | None, split: str) -> tuple[Dataset, Dataset]:
@@ -62,8 +73,14 @@ def main():
     ap.add_argument("--bright_root",
                     default=None)
     ap.add_argument("--doc_chunk", type=int, default=2000)
+    ap.add_argument("--device", default=None,
+                    help="torch device, e.g. cuda:0 or cpu. Default: cuda:0 if available, else cpu.")
     args = ap.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    device = args.device or ("cuda:0" if torch.cuda.is_available() else "cpu")
+    dtype = torch.float16 if device.startswith("cuda") else torch.float32
+    print(f"[eval] device={device} dtype={dtype}")
 
     print(f"[plain-bright] model={args.model}")
 
@@ -78,7 +95,7 @@ def main():
             model_name_or_path=args.model,
             query_length=qlen,
             document_length=args.document_length,
-            device="cuda:0",
+            device=device,
         )
 
         q_ds, d_ds = load_bright_split(args.bright_root, split)
@@ -100,18 +117,17 @@ def main():
         dim = d_embs[0].shape[1]
         N = len(d_embs)
         all_scores = np.zeros((len(queries), N), dtype=np.float32)
-        device = "cuda:0"
         for cs in range(0, N, args.doc_chunk):
             ce = min(cs + args.doc_chunk, N)
             chunk = d_embs[cs:ce]
             ML = max(d.shape[0] for d in chunk)
-            dt = torch.zeros(len(chunk), ML, dim, dtype=torch.float16, device=device)
+            dt = torch.zeros(len(chunk), ML, dim, dtype=dtype, device=device)
             dm = torch.zeros(len(chunk), ML, dtype=torch.bool, device=device)
             for i, d in enumerate(chunk):
                 L = d.shape[0]
-                dt[i, :L] = torch.from_numpy(d).to(torch.float16); dm[i, :L] = True
+                dt[i, :L] = torch.from_numpy(d).to(dtype); dm[i, :L] = True
             for qi, qe in enumerate(q_embs):
-                q = torch.from_numpy(qe).to(device, dtype=torch.float16)
+                q = torch.from_numpy(qe).to(device, dtype=dtype)
                 sim = torch.einsum("qd,nld->qnl", q, dt)
                 sim.masked_fill_(~dm.unsqueeze(0), -1e4)
                 max_per_t = sim.max(dim=-1).values   # [T_q, N_chunk]
@@ -138,7 +154,8 @@ def main():
         with open(out_file, "w") as f:
             json.dump(ev, f, indent=2)
         del m
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":

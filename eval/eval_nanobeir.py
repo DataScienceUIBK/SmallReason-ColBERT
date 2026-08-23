@@ -75,7 +75,13 @@ def main():
                     help="NanoBEIR queries are short (~10 tokens)")
     ap.add_argument("--document_length", type=int, default=512,
                     help="NanoBEIR docs are short paragraphs")
+    ap.add_argument("--device", default=None,
+                    help="torch device, e.g. cuda:0 or cpu. Default: cuda:0 if available, else cpu.")
     args = ap.parse_args()
+
+    device = args.device or ("cuda:0" if torch.cuda.is_available() else "cpu")
+    dtype = torch.float16 if device.startswith("cuda") else torch.float32
+    print(f"[eval] device={device} dtype={dtype}")
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.weighted:
@@ -103,7 +109,7 @@ def main():
                 query_length=args.query_length,
                 document_length=args.document_length,
                 head_path=head_path,
-                device="cuda:0",
+                device=device,
             )
             m.eval()
         else:
@@ -111,7 +117,7 @@ def main():
                 model_name_or_path=args.model,
                 query_length=args.query_length,
                 document_length=args.document_length,
-                device="cuda:0",
+                device=device,
             )
 
         corpus, queries, qrels = load_split(split)
@@ -143,23 +149,22 @@ def main():
 
         N = len(d_embs)
         all_scores = np.zeros((len(qs), N), dtype=np.float32)
-        device = "cuda:0"
 
         # Whole corpus in one chunk (NanoBEIR is small)
         ML = max(d.shape[0] for d in d_embs)
         dim = d_embs[0].shape[1]
-        dt = torch.zeros(N, ML, dim, dtype=torch.float16, device=device)
+        dt = torch.zeros(N, ML, dim, dtype=dtype, device=device)
         dm = torch.zeros(N, ML, dtype=torch.bool, device=device)
         for i, d in enumerate(d_embs):
             L = d.shape[0]
-            dt[i, :L] = torch.from_numpy(d).to(torch.float16); dm[i, :L] = True
+            dt[i, :L] = torch.from_numpy(d).to(dtype); dm[i, :L] = True
         for qi, qe in enumerate(q_embs):
-            q = torch.from_numpy(qe).to(device, dtype=torch.float16)
+            q = torch.from_numpy(qe).to(device, dtype=dtype)
             sim = torch.einsum("qd,nld->qnl", q, dt)
             sim.masked_fill_(~dm.unsqueeze(0), -1e4)
             max_per_t = sim.max(dim=-1).values
             if q_weights is not None:
-                w = torch.from_numpy(q_weights[qi]).to(device, dtype=torch.float16)
+                w = torch.from_numpy(q_weights[qi]).to(device, dtype=dtype)
                 w = w / (w.sum() + 1e-6)
                 all_scores[qi, :] = (max_per_t * w.unsqueeze(-1)).sum(dim=0).float().cpu().numpy()
             else:
@@ -181,7 +186,8 @@ def main():
         with open(out_file, "w") as f:
             json.dump(ev, f, indent=2)
         del m
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":

@@ -30,7 +30,9 @@ fi
 
 mkdir -p "$OUTPUT_DIR" "$HERE/logs"
 
-if [ ! -f "$HEAD_DIR/importance_head/model.safetensors" ]; then
+# HEAD_DIR may be a local directory or a Hugging Face repo id. Only validate the
+# local case; for a repo id the loader resolves (and validates) the head itself.
+if [ -d "$HEAD_DIR" ] && [ ! -f "$HEAD_DIR/importance_head/model.safetensors" ]; then
     echo "[launch_eval] ERROR: $HEAD_DIR/importance_head/model.safetensors not found."
     echo "             Run: python train/train_head.py  (then train/assemble_release.sh)"
     exit 1

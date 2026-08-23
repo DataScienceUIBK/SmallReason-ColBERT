@@ -40,12 +40,23 @@ from pylate import evaluation  # noqa: E402
 
 
 def load_arrow(p: Path) -> Dataset:
+    """Read a BRIGHT .arrow shard into a Dataset.
+
+    The stored schema metadata can reference `datasets` feature types that the
+    installed version does not know about (a cache written by a newer release
+    raises "Feature type 'List' not found"). We drop that metadata and let
+    Dataset infer features from the arrow schema itself.
+    """
     with pa.memory_map(str(p), "r") as mm:
         try:
-            return Dataset(ipc.open_file(mm).read_all())
+            table = ipc.open_file(mm).read_all()
         except Exception:
             mm.seek(0)
-            return Dataset(ipc.open_stream(mm).read_all())
+            table = ipc.open_stream(mm).read_all()
+    try:
+        return Dataset(table)
+    except ValueError:
+        return Dataset(table.replace_schema_metadata(None))
 
 
 def load_bright_split(bright_root: Path | None, split: str) -> tuple[Dataset, Dataset]:
@@ -85,14 +96,26 @@ def main():
                          "(HF datasets cache layout). If unset, downloads via load_dataset.")
     ap.add_argument("--doc_chunk", type=int, default=2000,
                     help="Docs per scoring chunk; lower if you hit OOM.")
+    ap.add_argument("--device", default=None,
+                    help="torch device, e.g. cuda:0 or cpu. Default: cuda:0 if available, else cpu.")
+    ap.add_argument("--dtype", default=None, choices=["float16", "float32"],
+                    help="Scoring precision. Default: float16 on GPU, float32 on CPU. "
+                         "float32 is slower but removes fp16 accumulation noise.")
     args = ap.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    device = args.device or ("cuda:0" if torch.cuda.is_available() else "cpu")
+    dtype = ({"float16": torch.float16, "float32": torch.float32}[args.dtype]
+             if args.dtype else
+             (torch.float16 if device.startswith("cuda") else torch.float32))
+    print(f"[eval] device={device} dtype={dtype}")
+
+    # --head_dir may be a local dir or a Hugging Face repo id. When it is a repo
+    # id there is no local file to point at, so let from_base resolve the head
+    # (it downloads from the Hub and raises if there is none).
     head_path = Path(args.head_dir) / IMPORTANCE_DIRNAME / "model.safetensors"
     if not head_path.exists():
-        raise FileNotFoundError(
-            f"No importance head at {head_path}. Run train/train_head.py first."
-        )
+        head_path = None
 
     for split in args.splits:
         qlen = args.pony_query_length if "pony" in split else args.query_length
@@ -104,7 +127,7 @@ def main():
         m = WeightedColBERT.from_base(
             args.base_model, query_length=qlen,
             document_length=args.document_length,
-            head_path=head_path, device="cuda:0",
+            head_path=head_path, device=device,
         )
         m.eval()
 
@@ -131,19 +154,18 @@ def main():
         dim = d_embs[0].shape[1]
         N = len(d_embs)
         all_scores = np.zeros((len(queries), N), dtype=np.float32)
-        device = "cuda:0"
         for cs in range(0, N, args.doc_chunk):
             ce = min(cs + args.doc_chunk, N)
             chunk = d_embs[cs:ce]
             ML = max(d.shape[0] for d in chunk)
-            dt = torch.zeros(len(chunk), ML, dim, dtype=torch.float16, device=device)
+            dt = torch.zeros(len(chunk), ML, dim, dtype=dtype, device=device)
             dm = torch.zeros(len(chunk), ML, dtype=torch.bool, device=device)
             for i, d in enumerate(chunk):
                 L = d.shape[0]
-                dt[i, :L] = torch.from_numpy(d).to(torch.float16); dm[i, :L] = True
+                dt[i, :L] = torch.from_numpy(d).to(dtype); dm[i, :L] = True
             for qi, qe in enumerate(q_embs):
-                q = torch.from_numpy(qe).to(device, dtype=torch.float16)
-                w = torch.from_numpy(q_weights[qi]).to(device, dtype=torch.float16)
+                q = torch.from_numpy(qe).to(device, dtype=dtype)
+                w = torch.from_numpy(q_weights[qi]).to(device, dtype=dtype)
                 w = w / (w.sum() + 1e-6)            # normalise at eval (per-query mean)
                 sim = torch.einsum("qd,nld->qnl", q, dt)
                 sim.masked_fill_(~dm.unsqueeze(0), -1e4)
@@ -170,7 +192,8 @@ def main():
         with open(out_file, "w") as f:
             json.dump(ev, f, indent=2)
         del m
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
