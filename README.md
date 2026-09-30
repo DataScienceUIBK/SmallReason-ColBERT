@@ -182,13 +182,11 @@ training data. The upstream base model is Apache-2.0.
 ## 📝 Citation
 
 ```bibtex
-@inproceedings{smallreason-colbert,
-  title     = {SmallReason-ColBERT: An Ultra-Small Late-Interaction Retriever
-               for Reasoning Intensive Retrieval},
-  author    = {Abdallah, Abdelrahman and Ali, Mohammed and Jatowt, Adam},
-  booktitle = {Proceedings of the 2026 Conference on Empirical Methods in
-               Natural Language Processing (EMNLP)},
-  year      = {2026}
+@article{abdallah2026smallreason,
+  title={SmallReason-ColBERT: An Ultra-Small Late-Interaction Retriever for Reasoning Intensive Retrieval},
+  author={Abdallah, Abdelrahman and Ali, Mohammed and Jatowt, Adam},
+  journal={arXiv preprint arXiv:2609.29652},
+  year={2026}
 }
 ```
 
